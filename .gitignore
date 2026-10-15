@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+dist-native/
+web-build/
+tmp/
+test-results/
+*.log
+*.zip
+.env
+.env.local
+.DS_Store

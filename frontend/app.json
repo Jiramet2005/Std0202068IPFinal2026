@@ -1,0 +1,7 @@
+{
+  "expo": {
+    "name": "HR Manager", "slug": "hr-manager-final2026", "version": "1.0.0",
+    "orientation": "portrait", "icon": "./assets/icon.png", "scheme": "hrmanager",
+    "userInterfaceStyle": "light", "web": { "output": "static" }, "plugins": ["expo-router"]
+  }
+}
