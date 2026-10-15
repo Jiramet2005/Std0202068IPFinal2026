@@ -14,6 +14,12 @@ function createMemoryStore() {
       employees.push(employee);
       return { ...employee };
     },
+    async updateEmployee(id, { name, position, salary }) {
+      const employee = employees.find(item => item.id === id);
+      if (!employee) return null;
+      Object.assign(employee, { name, position, salary });
+      return { ...employee };
+    },
     async toggleStatus(id) {
       const employee = employees.find(item => item.id === id);
       if (!employee) return null;

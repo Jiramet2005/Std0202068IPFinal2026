@@ -69,6 +69,19 @@ function createMysqlStore(database) {
       const [result] = await pool.execute('INSERT INTO Jiramet_employees (name, position, salary) VALUES (?, ?, ?)', [name, position, salary]);
       return { id: String(result.insertId), name, position, status: 'Active', salary };
     },
+    async updateEmployee(id, { name, position, salary }) {
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        const [rows] = await connection.execute(`${listSql} WHERE id = ? FOR UPDATE`, [id]);
+        if (!rows.length) { await connection.rollback(); return null; }
+        await connection.execute('UPDATE Jiramet_employees SET name = ?, position = ?, salary = ? WHERE id = ?', [name, position, salary, id]);
+        const [updated] = await connection.execute(`${listSql} WHERE id = ?`, [id]);
+        await connection.commit();
+        return mapEmployee(updated[0]);
+      } catch (error) { await connection.rollback(); throw error; }
+      finally { connection.release(); }
+    },
     async toggleStatus(id) {
       // A transaction keeps the returned row consistent with this atomic toggle.
       const connection = await pool.getConnection();

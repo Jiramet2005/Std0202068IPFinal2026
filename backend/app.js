@@ -2,6 +2,20 @@ const express = require('express');
 const cors = require('cors');
 const { salaryClusters } = require('./clustering');
 const { createMemoryStore } = require('./memory-store');
+function validateEmployee(req, res, next) {
+  const { name, position, salary } = req.body ?? {};
+  if (typeof name !== 'string' || !name.trim() || typeof position !== 'string' || !position.trim()) {
+    return res.status(400).json({ success: false, error: 'Name and position are required.' });
+  }
+  if ([name, position].some(value => [...value.trim()].length > 255)) {
+    return res.status(400).json({ success: false, error: 'Name and position must be at most 255 characters.' });
+  }
+  if (typeof salary !== 'number' || !Number.isFinite(salary) || salary < 0 || salary > Number.MAX_SAFE_INTEGER || Number(salary.toFixed(2)) !== salary) {
+    return res.status(400).json({ success: false, error: 'Salary must be a finite, non-negative number with at most 2 decimal places within the safe numeric range.' });
+  }
+  req.employeeValues = { name: name.trim(), position: position.trim(), salary };
+  next();
+}
 function createApp({ store = createMemoryStore(), webRoot } = {}) {
   const app = express();
   app.use(cors());
@@ -31,18 +45,8 @@ function createApp({ store = createMemoryStore(), webRoot } = {}) {
     res.json({ success: true, clusters });
   });
   app.get('/api/employees', async (_req, res) => res.json(await store.listEmployees()));
-  app.post('/api/employees', async (req, res) => {
-    const { name, position, salary } = req.body ?? {};
-    if (typeof name !== 'string' || !name.trim() || typeof position !== 'string' || !position.trim()) {
-      return res.status(400).json({ success: false, error: 'Name and position are required.' });
-    }
-    if ([name, position].some(value => [...value.trim()].length > 255)) {
-      return res.status(400).json({ success: false, error: 'Name and position must be at most 255 characters.' });
-    }
-    if (typeof salary !== 'number' || !Number.isFinite(salary) || salary < 0 || salary > Number.MAX_SAFE_INTEGER || Number(salary.toFixed(2)) !== salary) {
-      return res.status(400).json({ success: false, error: 'Salary must be a finite, non-negative number with at most 2 decimal places within the safe numeric range.' });
-    }
-    const employee = await store.addEmployee({ name: name.trim(), position: position.trim(), salary });
+  app.post('/api/employees', validateEmployee, async (req, res) => {
+    const employee = await store.addEmployee(req.employeeValues);
     return res.status(201).json(employee);
   });
   app.param('id', (req, res, next, id) => {
@@ -53,6 +57,11 @@ function createApp({ store = createMemoryStore(), webRoot } = {}) {
   });
   app.put('/api/employees/:id/status', async (req, res) => {
     const employee = await store.toggleStatus(req.params.id);
+    if (!employee) return res.status(404).json({ success: false, error: 'Employee not found.' });
+    return res.json(employee);
+  });
+  app.put('/api/employees/:id', validateEmployee, async (req, res) => {
+    const employee = await store.updateEmployee(req.params.id, req.employeeValues);
     if (!employee) return res.status(404).json({ success: false, error: 'Employee not found.' });
     return res.json(employee);
   });

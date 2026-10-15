@@ -24,10 +24,17 @@ async function verify() {
     assert.equal(persisted.name, name);
     assert.equal(persisted.salary, 12345.67);
     assert.equal((await second.toggleStatus(createdId)).status, 'On Leave');
+    const editedValues = { name: `${name} edited`, position: 'Edited integration check', salary: 23456.78 };
+    const edited = await second.updateEmployee(createdId, editedValues);
+    assert.deepEqual(edited, { id: createdId, ...editedValues, status: 'On Leave' });
+    assert.deepEqual(await second.updateEmployee(createdId, editedValues), edited, 'Saving unchanged values must succeed.');
+    await second.close();
+    second = createMysqlStore(config.database);
+    assert.deepEqual((await second.listEmployees()).find(item => item.id === createdId), edited, 'Edited fields must persist after reconnecting.');
     assert.equal((await second.toggleStatus(createdId)).status, 'Active');
     assert.equal(await second.deleteEmployee(createdId), true);
     createdId = undefined;
-    console.log('MySQL persistence, decimal salary, status toggle and deletion verified.');
+    console.log('MySQL persistence, editing, decimal salary, status toggle and deletion verified.');
   } finally {
     const cleanup = second || (firstClosed ? createMysqlStore(config.database) : first);
     try { if (createdId) await cleanup.deleteEmployee(createdId); }

@@ -2,6 +2,20 @@
 
 ผู้จัดทำ Jiramet Berkban รหัส 6730202068 ใช้ database `ip_std6730202068` และ port `3009` บน `119.59.102.161`
 
+## อัปเดตปุ่มแก้ไขและช่องค้นหา
+
+ชุดไฟล์พร้อมอัปโหลดในเครื่องของผู้จัดทำอยู่ที่ `tmp/cloud-upload/hr-final/backend/` อัปโหลด `app.js`, `memory-store.js`, `mysql-store.js`, `verify-mysql.js` และโฟลเดอร์ `public/` ไปแทนไฟล์ใน `/app/hr-final/backend` ผ่าน FileZilla โดยคง `.env` ของคลาวด์ไว้ ไม่ต้องสร้างตารางใหม่หรือรัน migration
+
+หยุด server HR เดิมด้วย Ctrl+C แล้วรันบน SSH:
+
+```sh
+cd /app/hr-final/backend
+node verify-mysql.js
+node server.js
+```
+
+เมื่อทดสอบฐานข้อมูลผ่านและ server เริ่มสำเร็จ เปิดเว็บแล้วกด Ctrl+F5 จะเห็นช่องค้นหาชื่อ/ตำแหน่ง และปุ่มแก้ไขในแต่ละรายชื่อ ปุ่มแก้ไขเปลี่ยนชื่อ ตำแหน่ง และเงินเดือน ส่วนสถานะยังเปลี่ยนด้วยปุ่มสลับสถานะเดิม
+
 ## เตรียมจาก source ที่ clone ใหม่
 
 ติดตั้ง Node.js 22.13 ขึ้นไปในเครื่องพัฒนา เปิด Terminal ที่โฟลเดอร์หลัก:

@@ -40,7 +40,7 @@ test('HTTP integration: auth, validation, CRUD, current-data analytics and empty
   assert.deepEqual(await call('/login', 'POST', { username: 'admin', password: 'password123' }, false), {
     status: 200, body: { success: true, token: 'mock-jwt-token' },
   });
-  for (const [path, method] of [['/employees', 'GET'], ['/employees', 'POST'], ['/employees/1/status', 'PUT'], ['/employees/1', 'DELETE'], ['/employees/salary-clusters', 'GET']]) {
+  for (const [path, method] of [['/employees', 'GET'], ['/employees', 'POST'], ['/employees/1/status', 'PUT'], ['/employees/1', 'PUT'], ['/employees/1', 'DELETE'], ['/employees/salary-clusters', 'GET']]) {
     assert.equal((await call(path, method, undefined, false)).status, 401);
   }
   const original = (await call('/employees')).body;
@@ -76,6 +76,42 @@ test('HTTP integration: auth, validation, CRUD, current-data analytics and empty
   for (const employee of (await call('/employees')).body) await call(`/employees/${employee.id}`, 'DELETE');
   assert.deepEqual((await call('/employees')).body, []);
   assert.deepEqual((await call('/employees/salary-clusters')).body.clusters, salaryClusters([]));
+});
+
+test('editing validates fields, preserves identity/status and feeds current salaries into analytics', async t => {
+  const server = createApp().listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/api/employees`;
+  const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer mock-jwt-token' };
+  const initial = await (await fetch(url, { headers })).json();
+  const id = initial[0].id;
+  const update = body => fetch(`${url}/${id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+  await fetch(`${url}/${id}/status`, { method: 'PUT', headers });
+  const valid = { name: '  จิรเมธ Berkban  ', position: ' Senior Engineer ', salary: 67890.25, status: 'Active', id: '999' };
+  for (const body of [{}, { ...valid, name: ' ' }, { ...valid, position: 'x'.repeat(256) }, { ...valid, salary: '100' }, { ...valid, salary: null }, { ...valid, salary: -1 }, { ...valid, salary: 1.234 }]) {
+    assert.equal((await update(body)).status, 400);
+  }
+  const afterInvalid = await (await fetch(url, { headers })).json();
+  assert.deepEqual(afterInvalid[0], { ...initial[0], status: 'On Leave' });
+  const saved = { ...initial[0], name: valid.name.trim(), position: valid.position.trim(), salary: valid.salary, status: 'On Leave' };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await update(valid);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), saved);
+  }
+  const current = await (await fetch(url, { headers })).json();
+  assert.equal(current.length, initial.length);
+  assert.deepEqual(current[0], saved);
+  const analytics = await (await fetch(`${url}/salary-clusters`, { headers })).json();
+  assert.deepEqual(analytics.clusters, salaryClusters(current.map(employee => employee.salary)));
+  const zero = await update({ ...valid, salary: 0 });
+  assert.equal(zero.status, 200); assert.equal((await zero.json()).salary, 0);
+  for (const missing of ['0', '1abc', '18446744073709551616', '999999']) {
+    assert.equal((await fetch(`${url}/${missing}`, { method: 'PUT', headers, body: JSON.stringify(valid) })).status, 404);
+  }
+  await fetch(`${url}/${id}`, { method: 'DELETE', headers });
+  assert.equal((await update(valid)).status, 404);
 });
 
 test('async database failures return a safe JSON error, without exposing credentials', async t => {

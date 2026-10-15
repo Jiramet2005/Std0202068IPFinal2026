@@ -116,6 +116,8 @@ EXPO_PUBLIC_API_URL=http://119.59.102.161:3009
 - Login พร้อมแจ้งเตือนเมื่อรหัสผิด; ป้องกัน Dashboard และ employee API ด้วย Bearer token
 - ปุ่ม ไทย / EN บนหน้า Login และ Dashboard เปลี่ยนข้อความ ฟอร์ม สถานะ และข้อความยืนยัน/แจ้งเตือนทันที เริ่มต้นภาษาไทย และเว็บจำภาษาที่เลือกไว้ใน browser
 - แสดงชื่อ ตำแหน่ง สถานะ เงินเดือน พร้อมฟอร์มเพิ่มพนักงาน
+- ค้นหาชื่อหรือตำแหน่งทันที รองรับไทย/อังกฤษและไม่แยกตัวพิมพ์เล็ก-ใหญ่ พร้อมปุ่มล้างและจำนวนผลลัพธ์ การค้นหาไม่เปลี่ยนยอดรวมและการวิเคราะห์ของทีมทั้งหมด
+- ปุ่มแก้ไขเปิดฟอร์มพร้อมข้อมูลเดิม เปลี่ยนชื่อ ตำแหน่ง และเงินเดือนได้ บันทึกแล้วอัปเดตรายชื่อและยอดรวมทันที ยกเลิกได้โดยไม่บันทึก รองรับทั้ง Memory และ MySQL โดยคง id และสถานะเดิม
 - ตรวจข้อมูลทั้ง frontend/backend: ห้ามค่าว่าง ชื่อ/ตำแหน่งไม่เกิน 255 ตัวอักษร เงินเดือนไม่ติดลบและทศนิยมไม่เกิน 2 ตำแหน่ง
 - Toggle Status: Active ↔ On Leave
 - Delete พร้อม “Are you sure?” ก่อนส่ง request (Native ใช้ Alert, Web ใช้ confirm)
@@ -130,6 +132,7 @@ EXPO_PUBLIC_API_URL=http://119.59.102.161:3009
 | POST | /api/login | 200, success และ token |
 | GET | /api/employees | 200, array พนักงาน |
 | POST | /api/employees | 201, พนักงานใหม่ |
+| PUT | /api/employees/:id | 200, พนักงานหลังแก้ไข name/position/salary; ไม่พบตอบ 404; ข้อมูลผิดตอบ 400 |
 | PUT | /api/employees/:id/status | 200, พนักงานหลังสลับสถานะ |
 | DELETE | /api/employees/:id | 200, success |
 | GET | /api/employees/salary-clusters | 200, success และ clusters; MySQL บันทึกผลด้วย |
@@ -175,7 +178,7 @@ npm run build:cloud
 
 ไฟล์เว็บจะอยู่ `backend/public/` โดยตั้ง API เป็นปลายทางคลาวด์ หากเปลี่ยน URL ใช้ `npm run build:cloud -- https://YOUR_API_HOST`
 
-ตรวจสอบล่าสุด: backend tests ผ่าน 12 ชุด ครอบคลุม API/validation/error handling/config/K-Means และ migration; TypeScript และ build เว็บ/Android/iOS ผ่าน การทดสอบ MySQL บนคลาวด์ผ่านการบันทึกข้อมูล ปิดและเปิด connection ใหม่ ตรวจทศนิยม สลับสถานะ และลบแถวทดสอบ การเปลี่ยนชื่อเป็น Jiramet_ สำเร็จโดยคงข้อมูลเดิมไว้ การกดใช้งาน UI ทุกขั้นตอนบน browser/มือถือจริงยังต้องตรวจด้วยตนเอง
+ตรวจสอบล่าสุด: backend tests ผ่าน 13 ชุด ครอบคลุม API/validation/error handling/config/K-Means, migration และการแก้ไขข้อมูล โดยตรวจว่าข้อมูลผิดไม่เปลี่ยนแถวเดิม การบันทึกซ้ำสำเร็จ สถานะ/id คงเดิม และการวิเคราะห์ใช้เงินเดือนใหม่; TypeScript และ build เว็บผ่าน รุ่นก่อนหน้าเคยผ่าน build Android/iOS และการทดสอบ MySQL บนคลาวด์ การเปลี่ยนชื่อเป็น Jiramet_ สำเร็จโดยคงข้อมูลเดิมไว้ หลังอัปโหลดรุ่นนี้ให้รัน verify-mysql.js เพื่อยืนยันการแก้ไขหลัง reconnect ด้วย การกดใช้งาน UI ทุกขั้นตอนบน browser/มือถือจริงยังต้องตรวจด้วยตนเอง
 
 ## โค้ดที่นำมาจากโปรเจกต์เดิม
 
