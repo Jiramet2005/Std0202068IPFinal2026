@@ -9,4 +9,7 @@ test-results/
 *.zip
 .env
 .env.local
+backend/public/
+backend/.runtime/
+*.pid
 .DS_Store

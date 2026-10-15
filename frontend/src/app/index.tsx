@@ -6,8 +6,10 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError, Cluster, Employee, request } from '@/lib/api';
 import { confirmDelete, showError } from '@/lib/dialogs';
+import { useLanguage } from '@/context/LanguageContext';
+import { TranslationKey } from '@/lib/i18n';
+import LanguageSwitch from '@/components/LanguageSwitch';
 
-const money = (value: number) => `฿${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const accents = ['#6558db', '#258e87', '#c17d29'];
 
 export default function Dashboard() {
@@ -16,6 +18,8 @@ export default function Dashboard() {
 }
 function EmployeeDashboard({ token }: { token: string }) {
   const { logout } = useAuth();
+  const { language, t, errorText } = useLanguage();
+  const money = (value: number) => `฿${value.toLocaleString(language === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   const { width } = useWindowDimensions();
   const wide = width >= 1000;
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -24,7 +28,7 @@ function EmployeeDashboard({ token }: { token: string }) {
   const [name, setName] = useState('');
   const [position, setPosition] = useState('');
   const [salary, setSalary] = useState('');
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useState<TranslationKey | ''>('');
   const [busy, setBusy] = useState(false);
   const mutationLock = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -35,8 +39,8 @@ function EmployeeDashboard({ token }: { token: string }) {
   const handleError = useCallback((err: unknown) => {
     if (err instanceof ApiError && err.status === 401) logout();
     const message = err instanceof Error ? err.message : 'Something went wrong.';
-    setError(message); showError(message);
-  }, [logout]);
+    setError(message); showError(errorText(message), t('errorTitle'));
+  }, [logout, errorText, t]);
   // Initial fetch is kept separate from user-triggered refreshes.
   useEffect(() => {
     let mounted = true;
@@ -62,10 +66,11 @@ function EmployeeDashboard({ token }: { token: string }) {
   }
   function addEmployee() {
     const numericSalary = Number(salary);
-    if (!name.trim() || !position.trim() || !salary.trim()) { setFormError('Name, position and salary are required.'); return; }
-    if (!/^\d+(\.\d+)?$/.test(salary.trim()) || !Number.isFinite(numericSalary) || numericSalary < 0 || numericSalary > Number.MAX_SAFE_INTEGER) {
-      setFormError('Enter a valid non-negative salary, such as 45000.'); return;
+    if (!name.trim() || !position.trim() || !salary.trim()) { setFormError('formRequired'); return; }
+    if (!/^\d+(\.\d{1,2})?$/.test(salary.trim()) || !Number.isFinite(numericSalary) || numericSalary < 0 || numericSalary > Number.MAX_SAFE_INTEGER) {
+      setFormError('salaryInvalid'); return;
     }
+    if ([name, position].some(value => [...value.trim()].length > 255)) { setFormError('fieldsTooLong'); return; }
     setFormError('');
     void mutate(async () => {
       const employee = await request<Employee>('/api/employees', token, { method: 'POST', body: JSON.stringify({ name: name.trim(), position: position.trim(), salary: numericSalary }) });
@@ -82,7 +87,7 @@ function EmployeeDashboard({ token }: { token: string }) {
     confirmDelete(employee.name, () => { void mutate(async () => {
       await request(`/api/employees/${employee.id}`, token, { method: 'DELETE' });
       setEmployees(current => current.filter(item => item.id !== employee.id));
-    }); });
+    }); }, { title: t('confirmTitle'), message: t('deletePrompt', { name: employee.name }), cancel: t('cancel'), confirm: t('delete') });
   }
   async function analyze() {
     if (analysisLock.current || mutationLock.current || loading) return;
@@ -99,44 +104,45 @@ function EmployeeDashboard({ token }: { token: string }) {
   const payroll = employees.reduce((sum, employee) => sum + employee.salary, 0);
 
   return <SafeAreaView style={s.page}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <View style={s.nav}><View style={s.brand}><View style={s.logo}><Feather name="users" size={19} color="#fff" /></View><Text style={s.brandText}>people<Text style={{ color: '#6558db' }}>.</Text></Text><View style={s.navDivider} /><Text style={s.navLabel}>HR workspace</Text></View>
-      <Pressable accessibilityRole="button" onPress={logout} style={s.outline}><Feather name="log-out" size={16} color="#71778b" /><Text style={s.smallText}>Sign out</Text></Pressable></View>
+    <View style={s.nav}><View style={s.brand}><View style={s.logo}><Feather name="users" size={19} color="#fff" /></View><Text style={s.brandText}>people<Text style={{ color: '#6558db' }}>.</Text></Text><View style={s.navDivider} /><Text style={s.navLabel}>{t('workspace')}</Text></View>
+      <View style={s.headerActions}><LanguageSwitch /><Pressable accessibilityRole="button" onPress={logout} style={s.outline}><Feather name="log-out" size={16} color="#71778b" /><Text style={s.smallText}>{t('signOut')}</Text></Pressable></View></View>
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}>
-      <View style={s.heading}><View><Text style={s.eyebrow}>YOUR TEAM, AT A GLANCE</Text><Text style={s.title}>Team overview</Text><Text style={s.subtitle}>A clear view of your people and their potential.</Text></View><View style={s.admin}><View style={s.avatar}><Text style={{ color: '#6558db', fontWeight: '700' }}>A</Text></View><View><Text style={s.adminName}>Administrator</Text><Text style={s.smallText}>HR Manager</Text></View></View></View>
+      <View style={s.heading}><View><Text style={s.eyebrow}>{t('teamEyebrow')}</Text><Text style={s.title}>{t('teamTitle')}</Text><Text style={s.subtitle}>{t('teamSubtitle')}</Text></View><View style={s.admin}><View style={s.avatar}><Text style={{ color: '#6558db', fontWeight: '700' }}>A</Text></View><View><Text style={s.adminName}>{t('administrator')}</Text><Text style={s.smallText}>{t('hrManager')}</Text></View></View></View>
       <View style={s.stats}>{[
-        { label: 'Total employees', value: String(employees.length), icon: 'users' as const, color: '#6558db' },
-        { label: 'Active team members', value: String(active), icon: 'user-check' as const, color: '#258e87' },
-        { label: 'On leave', value: String(employees.length - active), icon: 'coffee' as const, color: '#c17d29' },
-        { label: 'Monthly payroll', value: money(payroll), icon: 'credit-card' as const, color: '#4b7cb8' },
+        { label: t('totalEmployees'), value: String(employees.length), icon: 'users' as const, color: '#6558db' },
+        { label: t('activeEmployees'), value: String(active), icon: 'user-check' as const, color: '#258e87' },
+        { label: t('onLeave'), value: String(employees.length - active), icon: 'coffee' as const, color: '#c17d29' },
+        { label: t('monthlyPayroll'), value: money(payroll), icon: 'credit-card' as const, color: '#4b7cb8' },
       ].map(stat => <View key={stat.label} style={s.stat}><View style={s.statHeading}><Text style={s.smallText}>{stat.label}</Text><Feather name={stat.icon} size={18} color={stat.color} /></View><Text style={s.statValue}>{loading ? '—' : stat.value}</Text></View>)}</View>
-      {!!error && <View style={s.errorBanner}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Pressable accessibilityRole="button" disabled={disabled} onPress={refresh}><Text style={s.link}>Retry</Text></Pressable></View>}
+      {!!error && <View style={s.errorBanner}><Text accessibilityRole="alert" style={s.error}>{errorText(error)}</Text><Pressable accessibilityRole="button" disabled={disabled} onPress={refresh}><Text style={s.link}>{t('retry')}</Text></Pressable></View>}
       <View style={[s.columns, !wide && { flexDirection: 'column' }]}>
-        <View style={[s.panel, { flex: 1 }]}><View style={s.sectionHeading}><View><Text style={s.sectionTitle}>Employee directory</Text><Text style={s.smallText}>{employees.length} people in your team</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Refresh employees" disabled={disabled} onPress={refresh} style={s.iconButton}><Feather name="refresh-cw" size={17} color="#71778b" /></Pressable></View>
-          {loading && <View style={s.empty}><ActivityIndicator color="#6558db" /><Text style={s.smallText}>Loading employees...</Text></View>}
-          {!loading && employees.length === 0 && <View style={s.empty}><Feather name="users" size={30} color="#a5a4c1" /><Text style={s.sectionTitle}>Your team starts here</Text><Text style={s.smallText}>Add your first employee using the form.</Text></View>}
+        <View style={[s.panel, { flex: 1 }]}><View style={s.sectionHeading}><View><Text style={s.sectionTitle}>{t('directory')}</Text><Text style={s.smallText}>{t('teamCount', { count: employees.length })}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={t('refresh')} disabled={disabled} onPress={refresh} style={s.iconButton}><Feather name="refresh-cw" size={17} color="#71778b" /></Pressable></View>
+          {loading && <View style={s.empty}><ActivityIndicator color="#6558db" /><Text style={s.smallText}>{t('loadingEmployees')}</Text></View>}
+          {!loading && employees.length === 0 && <View style={s.empty}><Feather name="users" size={30} color="#a5a4c1" /><Text style={s.sectionTitle}>{t('emptyTitle')}</Text><Text style={s.smallText}>{t('emptySubtitle')}</Text></View>}
           {!loading && employees.map((employee, i) => <View key={employee.id} style={s.employee}>
-            <View style={s.employeeTop}><View style={[s.avatar, { backgroundColor: ['#eeebff', '#e7f4f2', '#fff1df'][i % 3] }]}><Text style={{ color: accents[i % 3], fontWeight: '700' }}>{employee.name.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={s.employeeName}>{employee.name}</Text><Text style={s.position}>{employee.position}</Text></View><Text style={s.salary}>{money(employee.salary)}<Text style={s.perMonth}> / mo</Text></Text></View>
-            <View style={s.employeeBottom}><View style={[s.badge, employee.status === 'On Leave' && { backgroundColor: '#fff3df' }]}><View style={[s.dot, employee.status === 'On Leave' && { backgroundColor: '#c17d29' }]} /><Text style={[s.badgeText, employee.status === 'On Leave' && { color: '#a36a20' }]}>{employee.status}</Text></View><View style={s.actions}><Pressable accessibilityRole="button" accessibilityLabel={`Toggle Status for ${employee.name}`} disabled={disabled} onPress={() => toggle(employee)} style={[s.action, disabled && s.dim]}><Feather name="repeat" size={13} color="#6558db" /><Text style={s.link}>Toggle Status</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Delete ${employee.name}`} disabled={disabled} onPress={() => remove(employee)} style={[s.action, disabled && s.dim]}><Feather name="trash-2" size={13} color="#c84c61" /><Text style={s.deleteText}>Delete</Text></Pressable></View></View>
+            <View style={s.employeeTop}><View style={[s.avatar, { backgroundColor: ['#eeebff', '#e7f4f2', '#fff1df'][i % 3] }]}><Text style={{ color: accents[i % 3], fontWeight: '700' }}>{employee.name.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={s.employeeName}>{employee.name}</Text><Text style={s.position}>{employee.position}</Text></View><Text style={s.salary}>{money(employee.salary)}<Text style={s.perMonth}>{t('perMonth')}</Text></Text></View>
+            <View style={s.employeeBottom}><View style={[s.badge, employee.status === 'On Leave' && { backgroundColor: '#fff3df' }]}><View style={[s.dot, employee.status === 'On Leave' && { backgroundColor: '#c17d29' }]} /><Text style={[s.badgeText, employee.status === 'On Leave' && { color: '#a36a20' }]}>{t(employee.status === 'Active' ? 'statusActive' : 'statusOnLeave')}</Text></View><View style={s.actions}><Pressable accessibilityRole="button" accessibilityLabel={t('toggleFor', { name: employee.name })} disabled={disabled} onPress={() => toggle(employee)} style={[s.action, disabled && s.dim]}><Feather name="repeat" size={13} color="#6558db" /><Text style={s.link}>{t('toggleStatus')}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={t('deleteFor', { name: employee.name })} disabled={disabled} onPress={() => remove(employee)} style={[s.action, disabled && s.dim]}><Feather name="trash-2" size={13} color="#c84c61" /><Text style={s.deleteText}>{t('delete')}</Text></Pressable></View></View>
           </View>)}
         </View>
-        <View style={[s.panel, wide ? { width: 320, alignSelf: 'flex-start' } : { width: '100%' }]}><View style={s.sectionHeading}><View><Text style={s.sectionTitle}>Add employee</Text><Text style={s.smallText}>Make room for someone new.</Text></View><Feather name="user-plus" size={20} color="#6558db" /></View><View style={s.form}>
-          <Text style={s.label}>Full name</Text><TextInput accessibilityLabel="Full name" style={s.input} placeholder="e.g. John Doe" placeholderTextColor="#969aab" value={name} onChangeText={setName} editable={!disabled} />
-          <Text style={s.label}>Position</Text><TextInput accessibilityLabel="Position" style={s.input} placeholder="e.g. Software Engineer" placeholderTextColor="#969aab" value={position} onChangeText={setPosition} editable={!disabled} />
-          <Text style={s.label}>Monthly salary (THB)</Text><TextInput accessibilityLabel="Monthly salary" style={s.input} placeholder="e.g. 45000" placeholderTextColor="#969aab" keyboardType="decimal-pad" value={salary} onChangeText={setSalary} editable={!disabled} onSubmitEditing={addEmployee} />
-          {!!formError && <Text accessibilityRole="alert" style={s.error}>{formError}</Text>}
-          <Pressable accessibilityRole="button" disabled={disabled} onPress={addEmployee} style={[s.button, disabled && s.dim]}>{busy ? <ActivityIndicator color="#fff" /> : <Feather name="plus" size={17} color="#fff" />}<Text style={s.buttonText}>Add Employee</Text></Pressable><Text style={s.formHint}>New employees start with an Active status.</Text>
+        <View style={[s.panel, wide ? { width: 320, alignSelf: 'flex-start' } : { width: '100%' }]}><View style={s.sectionHeading}><View><Text style={s.sectionTitle}>{t('addEmployee')}</Text><Text style={s.smallText}>{t('addSubtitle')}</Text></View><Feather name="user-plus" size={20} color="#6558db" /></View><View style={s.form}>
+          <Text style={s.label}>{t('fullName')}</Text><TextInput accessibilityLabel={t('fullName')} style={s.input} placeholder={t('namePlaceholder')} placeholderTextColor="#969aab" value={name} onChangeText={setName} editable={!disabled} />
+          <Text style={s.label}>{t('position')}</Text><TextInput accessibilityLabel={t('position')} style={s.input} placeholder={t('positionPlaceholder')} placeholderTextColor="#969aab" value={position} onChangeText={setPosition} editable={!disabled} />
+          <Text style={s.label}>{t('monthlySalary')}</Text><TextInput accessibilityLabel={t('monthlySalary')} style={s.input} placeholder={t('salaryPlaceholder')} placeholderTextColor="#969aab" keyboardType="decimal-pad" value={salary} onChangeText={setSalary} editable={!disabled} onSubmitEditing={addEmployee} />
+          {!!formError && <Text accessibilityRole="alert" style={s.error}>{t(formError)}</Text>}
+          <Pressable accessibilityRole="button" disabled={disabled} onPress={addEmployee} style={[s.button, disabled && s.dim]}>{busy ? <ActivityIndicator color="#fff" /> : <Feather name="plus" size={17} color="#fff" />}<Text style={s.buttonText}>{t('addEmployee')}</Text></Pressable><Text style={s.formHint}>{t('newStatusHint')}</Text>
         </View></View>
       </View>
-      <View style={s.analytics}><View style={s.analyticsHeading}><View style={{ flex: 1, minWidth: 180 }}><View style={s.analyticsLabel}><Feather name="bar-chart-2" size={18} color="#6558db" /><Text style={s.eyebrow}>SALARY INTELLIGENCE</Text></View><Text style={s.sectionTitle}>Understand your salary structure</Text><Text style={s.subtitle}>Group current salaries into three tiers with K-Means.</Text></View><Pressable accessibilityRole="button" disabled={disabled} onPress={analyze} style={[s.button, disabled && s.dim]}>{analyzing ? <ActivityIndicator color="#fff" /> : <Feather name="pie-chart" size={16} color="#fff" />}<Text style={s.buttonText}>{analyzing ? 'Analyzing...' : 'Analyze Salary Structure'}</Text></Pressable></View>
-        {analyzing && <View style={s.empty}><ActivityIndicator size="large" color="#6558db" /><Text style={s.smallText}>Calculating salary groups...</Text></View>}
-        {!analyzing && !clusters && <View style={s.analysisEmpty}><Text style={s.smallText}>Run an analysis to see the employee count and average salary for each tier.</Text></View>}
-        {clusters && <View style={s.tiers}>{clusters.map((cluster, i) => <View key={cluster.group} style={[s.tier, { borderTopColor: accents[i] }]}><Text style={[s.eyebrow, { color: accents[i] }]}>{cluster.group.toUpperCase()}</Text><Text style={s.tierValue}>{cluster.centroid === null ? '—' : money(cluster.centroid)}</Text><Text style={s.smallText}>Average monthly salary</Text><View style={s.tierBottom}><Text style={s.adminName}>{cluster.count} {cluster.count === 1 ? 'employee' : 'employees'}</Text><Text style={s.smallText}>{cluster.count === 0 ? 'No salaries in this tier' : 'K-Means · k = 3'}</Text></View></View>)}</View>}
-      </View><Text style={s.footer}>People first. Decisions backed by data.</Text>
+      <View style={s.analytics}><View style={s.analyticsHeading}><View style={{ flex: 1, minWidth: 180 }}><View style={s.analyticsLabel}><Feather name="bar-chart-2" size={18} color="#6558db" /><Text style={s.eyebrow}>{t('salaryIntelligence')}</Text></View><Text style={s.sectionTitle}>{t('analysisTitle')}</Text><Text style={s.subtitle}>{t('analysisSubtitle')}</Text></View><Pressable accessibilityRole="button" disabled={disabled} onPress={analyze} style={[s.button, disabled && s.dim]}>{analyzing ? <ActivityIndicator color="#fff" /> : <Feather name="pie-chart" size={16} color="#fff" />}<Text style={s.buttonText}>{t(analyzing ? 'analyzing' : 'analyze')}</Text></Pressable></View>
+        {analyzing && <View style={s.empty}><ActivityIndicator size="large" color="#6558db" /><Text style={s.smallText}>{t('calculating')}</Text></View>}
+        {!analyzing && !clusters && <View style={s.analysisEmpty}><Text style={s.smallText}>{t('analysisHint')}</Text></View>}
+        {clusters && <View style={s.tiers}>{clusters.map((cluster, i) => <View key={cluster.group} style={[s.tier, { borderTopColor: accents[i] }]}><Text style={[s.eyebrow, { color: accents[i] }]}>{t('tier', { number: i + 1 }).toUpperCase()}</Text><Text style={s.tierValue}>{cluster.centroid === null ? '—' : money(cluster.centroid)}</Text><Text style={s.smallText}>{t('averageSalary')}</Text><View style={s.tierBottom}><Text style={s.adminName}>{t(cluster.count === 1 ? 'employeeOne' : 'employeeMany', { count: cluster.count })}</Text><Text style={s.smallText}>{cluster.count === 0 ? t('emptyTier') : 'K-Means · k = 3'}</Text></View></View>)}</View>}
+      </View><Text style={s.footer}>{t('footer')}</Text>
     </ScrollView>
   </KeyboardAvoidingView></SafeAreaView>;
 }
 const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f5f6fa' }, nav: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e9ebf2', paddingHorizontal: 24, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  page: { flex: 1, backgroundColor: '#f5f6fa' }, nav: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e9ebf2', paddingHorizontal: 24, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 }, logo: { padding: 8, backgroundColor: '#6558db', borderRadius: 10 }, brandText: { fontSize: 25, fontWeight: '800', color: '#20243b' }, navDivider: { height: 22, width: 1, backgroundColor: '#e5e7ef', marginHorizontal: 8 }, navLabel: { color: '#71778b', fontSize: 12 },
   outline: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 8 }, smallText: { color: '#7b8194', fontSize: 12, lineHeight: 19 }, content: { padding: 24, maxWidth: 1240, width: '100%', alignSelf: 'center', gap: 24 },
   heading: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, alignItems: 'center' }, eyebrow: { color: '#6558db', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 }, title: { color: '#20243b', fontSize: 30, fontWeight: '800', marginTop: 8 }, subtitle: { color: '#7b8194', fontSize: 13, lineHeight: 21, marginTop: 7 },

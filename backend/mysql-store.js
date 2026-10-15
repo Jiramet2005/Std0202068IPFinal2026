@@ -3,22 +3,26 @@ const { randomBytes, scryptSync, timingSafeEqual, createHash } = require('node:c
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const { initialEmployees } = require('./seed');
+const { requireCurrentTableNames } = require('./migrate-table-names');
 const tokenHash = token => createHash('sha256').update(token).digest('hex');
 const mapEmployee = row => ({ id: String(row.id), name: row.name, position: row.position, status: row.status, salary: Number(row.salary) });
 
 function createMysqlStore(database) {
   const pool = mysql.createPool(database);
-  const listSql = 'SELECT id, name, position, status, salary FROM hr_employees';
+  const listSql = 'SELECT id, name, position, status, salary FROM Jiramet_employees';
   return {
     mode: 'mysql',
     pool,
     async health() {
-      await pool.query('SELECT 1 FROM hr_employees LIMIT 1');
-      await pool.query('SELECT 1 FROM hr_users LIMIT 1');
-      await pool.query('SELECT 1 FROM hr_sessions LIMIT 1');
-      await pool.query('SELECT 1 FROM hr_salary_analyses LIMIT 1');
+      await requireCurrentTableNames(pool);
+      await pool.query('SELECT 1 FROM Jiramet_employees LIMIT 1');
+      await pool.query('SELECT 1 FROM Jiramet_users LIMIT 1');
+      await pool.query('SELECT 1 FROM Jiramet_sessions LIMIT 1');
+      await pool.query('SELECT 1 FROM Jiramet_salary_analyses LIMIT 1');
     },
     async initialize() {
+      // Refuse to create empty new tables beside old ones. Rename the originals first.
+      await requireCurrentTableNames(pool);
       // Execute our fixed schema one statement at a time. multipleStatements stays disabled.
       const schema = readFileSync(path.join(__dirname, 'schema.sql'), 'utf8')
         .split('\n').filter(line => !line.trimStart().startsWith('--')).join('\n');
@@ -26,13 +30,13 @@ function createMysqlStore(database) {
       const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
-        const [migration] = await connection.execute('INSERT IGNORE INTO hr_schema_migrations (version) VALUES (?)', ['initial-hr-v1']);
+        const [migration] = await connection.execute('INSERT IGNORE INTO Jiramet_schema_migrations (version) VALUES (?)', ['initial-hr-v1']);
         if (migration.affectedRows === 1) {
           const salt = randomBytes(16).toString('hex');
           const hash = scryptSync('password123', salt, 64).toString('hex');
-          await connection.execute('INSERT INTO hr_users (username, password_salt, password_hash) VALUES (?, ?, ?)', ['admin', salt, hash]);
+          await connection.execute('INSERT INTO Jiramet_users (username, password_salt, password_hash) VALUES (?, ?, ?)', ['admin', salt, hash]);
           for (const employee of initialEmployees) {
-            await connection.execute('INSERT INTO hr_employees (name, position, status, salary) VALUES (?, ?, ?, ?)',
+            await connection.execute('INSERT INTO Jiramet_employees (name, position, status, salary) VALUES (?, ?, ?, ?)',
               [employee.name, employee.position, employee.status, employee.salary]);
           }
         }
@@ -42,18 +46,19 @@ function createMysqlStore(database) {
     },
     async verifyLogin(username, password) {
       if (typeof username !== 'string' || typeof password !== 'string') return false;
-      const [rows] = await pool.execute('SELECT id, password_salt, password_hash FROM hr_users WHERE username = ?', [username]);
+      const [rows] = await pool.execute('SELECT id, password_salt, password_hash FROM Jiramet_users WHERE username = ?', [username]);
       if (!rows.length) return false;
       const expected = Buffer.from(rows[0].password_hash, 'hex');
       const actual = scryptSync(password, rows[0].password_salt, 64);
       if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return false;
-      await pool.execute('INSERT INTO hr_sessions (token_hash, user_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), created_at = CURRENT_TIMESTAMP',
+      await pool.execute('INSERT INTO Jiramet_sessions (token_hash, user_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), created_at = CURRENT_TIMESTAMP',
         [tokenHash('mock-jwt-token'), rows[0].id]);
       return true;
     },
     async isAuthorized(token) {
       if (token !== 'mock-jwt-token') return false;
-      const [rows] = await pool.execute('SELECT user_id FROM hr_sessions WHERE token_hash = ?', [tokenHash(token)]);
+      // Validate the account as well as the session without requiring a foreign key.
+      const [rows] = await pool.execute('SELECT s.user_id FROM Jiramet_sessions s INNER JOIN Jiramet_users u ON u.id = s.user_id WHERE s.token_hash = ?', [tokenHash(token)]);
       return rows.length > 0;
     },
     async listEmployees() {
@@ -61,16 +66,15 @@ function createMysqlStore(database) {
       return rows.map(mapEmployee);
     },
     async addEmployee({ name, position, salary }) {
-      const [result] = await pool.execute('INSERT INTO hr_employees (name, position, salary) VALUES (?, ?, ?)', [name, position, salary]);
-      const [rows] = await pool.execute(`${listSql} WHERE id = ?`, [String(result.insertId)]);
-      return mapEmployee(rows[0]);
+      const [result] = await pool.execute('INSERT INTO Jiramet_employees (name, position, salary) VALUES (?, ?, ?)', [name, position, salary]);
+      return { id: String(result.insertId), name, position, status: 'Active', salary };
     },
     async toggleStatus(id) {
       // A transaction keeps the returned row consistent with this atomic toggle.
       const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
-        const [result] = await connection.execute("UPDATE hr_employees SET status = IF(status = 'Active', 'On Leave', 'Active') WHERE id = ?", [id]);
+        const [result] = await connection.execute("UPDATE Jiramet_employees SET status = IF(status = 'Active', 'On Leave', 'Active') WHERE id = ?", [id]);
         if (!result.affectedRows) { await connection.rollback(); return null; }
         const [rows] = await connection.execute(`${listSql} WHERE id = ?`, [id]);
         await connection.commit();
@@ -79,11 +83,11 @@ function createMysqlStore(database) {
       finally { connection.release(); }
     },
     async deleteEmployee(id) {
-      const [result] = await pool.execute('DELETE FROM hr_employees WHERE id = ?', [id]);
+      const [result] = await pool.execute('DELETE FROM Jiramet_employees WHERE id = ?', [id]);
       return result.affectedRows > 0;
     },
     async recordAnalysis(salaries, clusters) {
-      await pool.execute('INSERT INTO hr_salary_analyses (employee_count, salary_snapshot, clusters) VALUES (?, ?, ?)',
+      await pool.execute('INSERT INTO Jiramet_salary_analyses (employee_count, salary_snapshot, clusters) VALUES (?, ?, ?)',
         [salaries.length, JSON.stringify(salaries), JSON.stringify(clusters)]);
     },
     async close() { await pool.end(); },

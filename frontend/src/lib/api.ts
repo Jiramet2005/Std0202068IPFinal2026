@@ -2,7 +2,9 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 const devHost = Constants.expoConfig?.hostUri?.split(':')[0];
 const defaultHost = Platform.OS === 'web' ? 'localhost' : devHost || (Platform.OS === 'android' ? '10.0.2.2' : 'localhost');
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || `http://${defaultHost}:5000`).replace(/\/$/, '');
+const defaultUrl = Platform.OS === 'web' && typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+  ? window.location.origin : `http://${defaultHost}:5000`;
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL || defaultUrl).replace(/\/$/, '');
 export type Employee = { id: string; name: string; position: string; status: 'Active' | 'On Leave'; salary: number };
 export type Cluster = { group: string; centroid: number | null; count: number };
 export class ApiError extends Error {

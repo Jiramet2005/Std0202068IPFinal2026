@@ -46,7 +46,7 @@ test('HTTP integration: auth, validation, CRUD, current-data analytics and empty
   const original = (await call('/employees')).body;
   assert.ok(original.length >= 5);
   const valid = { name: '  New Person  ', position: ' Engineer ', salary: 35000 };
-  for (const bad of [{}, { ...valid, name: ' ' }, { ...valid, position: '' }, { ...valid, salary: '' }, { ...valid, salary: '35000' }, { ...valid, salary: null }, { ...valid, salary: -1 }, { ...valid, salary: true }, { ...valid, salary: Number.MAX_VALUE }]) {
+  for (const bad of [{}, { ...valid, name: ' ' }, { ...valid, name: 'x'.repeat(256) }, { ...valid, position: '' }, { ...valid, salary: '' }, { ...valid, salary: '35000' }, { ...valid, salary: null }, { ...valid, salary: -1 }, { ...valid, salary: true }, { ...valid, salary: 35000.123 }, { ...valid, salary: Number.MAX_VALUE }]) {
     assert.equal((await call('/employees', 'POST', bad)).status, 400);
   }
   const malformed = await fetch(`${url}/api/employees`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer mock-jwt-token' }, body: '{bad json' });
@@ -56,6 +56,10 @@ test('HTTP integration: auth, validation, CRUD, current-data analytics and empty
   assert.equal(created.status, 201); assert.equal(created.body.name, 'New Person');
   assert.equal(created.body.position, 'Engineer'); assert.equal(typeof created.body.salary, 'number');
   const id = created.body.id;
+  for (const invalidId of ['1abc', '-1', '0', '18446744073709551616']) {
+    assert.equal((await call(`/employees/${invalidId}/status`, 'PUT')).status, 404);
+    assert.equal((await call(`/employees/${invalidId}`, 'DELETE')).status, 404);
+  }
   assert.equal((await call(`/employees/${id}/status`, 'PUT')).body.status, 'On Leave');
   assert.equal((await call(`/employees/${id}/status`, 'PUT')).body.status, 'Active');
   const current = (await call('/employees')).body;
@@ -72,4 +76,18 @@ test('HTTP integration: auth, validation, CRUD, current-data analytics and empty
   for (const employee of (await call('/employees')).body) await call(`/employees/${employee.id}`, 'DELETE');
   assert.deepEqual((await call('/employees')).body, []);
   assert.deepEqual((await call('/employees/salary-clusters')).body.clusters, salaryClusters([]));
+});
+
+test('async database failures return a safe JSON error, without exposing credentials', async t => {
+  const { createMemoryStore } = require('./memory-store');
+  const store = createMemoryStore();
+  store.health = async () => { throw Object.assign(new Error('private database details'), { code: 'ECONNREFUSED' }); };
+  const server = createApp({ store }).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/health`);
+  assert.equal(response.status, 503);
+  const data = await response.json();
+  assert.equal(data.success, false);
+  assert.ok(!data.error.includes('private database details'));
 });

@@ -1,32 +1,64 @@
-# HR Manager & Salary Analytics System
+﻿# HR Manager & Salary Analytics System
 
-โปรเจกต์สอบ Internet Programming 2026 ปรับจาก MyProfileAppNindam1 ตามข้อกำหนดใน Final.pdf
+โปรเจกต์ `Std0202068IPFinal2026` โดย **Jiramet Berkban — 6730202068** ปรับจาก MyProfileAppNindam1 มี Express backend และ React Native / Expo SDK 57 frontend
 
-ชื่อ repository ที่ผู้ใช้เลือก: **Std0202068IPFinal2026** (เลข 7 หลักท้ายของ 6730202068)
+## โหมดที่รองรับ
+
+- **MySQL / คลาวด์อาจารย์:** ข้อมูลพนักงาน บัญชีแอป session และประวัติผลวิเคราะห์เก็บใน MySQL ข้อมูลยังอยู่เมื่อรีสตาร์ต backend
+- **Memory / ตาม Final.pdf:** เก็บพนักงานใน array และเริ่มต้นข้อมูลใหม่เมื่อรีสตาร์ต ใช้ `STORAGE_MODE=memory`
 
 ```text
 Std0202068IPFinal2026/
-├── backend/       Express.js + in-memory employee array + K-Means
-├── frontend/      React Native / Expo SDK 57 / Expo Router
-├── .gitignore
+├── backend/
+│   ├── app.js, server.js, clustering.js
+│   ├── memory-store.js, mysql-store.js, config.js
+│   ├── schema.sql, init-db.js, verify-mysql.js
+│   ├── .env.example
+│   └── public/       generated web build; ไม่ใส่ Git/ZIP source
+├── frontend/
+├── DEPLOYMENT.md
 └── README.md
 ```
 
-## เริ่มใช้งาน
+## ค่าคลาวด์ที่ตรวจพบจากโปรเจกต์เดิม
 
-ใช้ Node.js 22.13 ขึ้นไป (เครื่องนี้ทดสอบด้วย Node.js 24.13.0) เปิด Terminal แยกกัน 2 หน้าต่าง
+| รายการ | ค่า |
+| --- | --- |
+| Host | 119.59.102.161 |
+| SSH Terminal | port 2222, interactive session เท่านั้น |
+| SFTP / FileZilla | port 22 |
+| Cloud user | std6730202068 |
+| Database | ip_std6730202068 |
+| DB host เมื่อรันบนคลาวด์ | localhost:3306 |
+| Backend port ในโปรเจกต์เดิม | 3009 |
+| โฟลเดอร์ที่เตรียมสำหรับ HR | /app/hr-final/backend |
+| URL หลังรันสำเร็จ | http://119.59.102.161:3009 |
 
-Terminal แรก:
+เมื่อรันแบบ foreground ต้องเปิด SSH ค้างไว้ โปรดดูขั้นตอนติดตั้งและเปิดเว็บใน [DEPLOYMENT.md](DEPLOYMENT.md)
+
+## บัญชีล็อกอินแอป
+
+- Username: `admin`
+- Password: `password123`
+- Response ตามโจทย์: `{ "success": true, "token": "mock-jwt-token" }`
+
+บัญชีนี้แยกจากบัญชี SSH / SFTP / MySQL ของนักศึกษา ห้ามใช้รหัสคลาวด์ในฟอร์มล็อกอินแอป
+
+## รันแบบ Memory ในเครื่อง
+
+Backend รองรับ Node.js 18 ขึ้นไป; frontend Expo SDK 57 ใช้ Node.js 22.13 ขึ้นไป
+
+Terminal 1:
 
 ```powershell
 cd backend
 npm ci
+$env:STORAGE_MODE='memory'
+$env:PORT='5000'
 npm start
 ```
 
-API ทำงานที่ `http://localhost:5000` ไม่ต้องติดตั้ง MySQL หรือสร้างฐานข้อมูล
-
-Terminal ที่สอง จากโฟลเดอร์หลัก:
+Terminal 2 จากโฟลเดอร์หลัก:
 
 ```powershell
 cd frontend
@@ -34,87 +66,92 @@ npm ci
 npm start
 ```
 
-กด `w` เพื่อเปิดเว็บ หรือสแกน QR ด้วย Expo Go ที่รองรับ SDK 57 สามารถใช้ `npm run web`, `npm run android` หรือ `npm run ios` ตามอุปกรณ์ที่มี (iOS Simulator ต้องใช้ macOS)
+กด `w` เพื่อเปิดเว็บ หรือใช้ Expo Go ที่รองรับ SDK 57 บนมือถือ backend ทำงานที่ localhost:5000 หากใช้มือถือจริงให้ตั้ง `frontend/.env` เป็น IP ของคอมพิวเตอร์ตามตัวอย่างใน `.env.example`
 
-บัญชีตามโจทย์:
+environment variable ของ Terminal จะมีความสำคัญกว่าไฟล์ `.env` หากจะเปลี่ยนกลับเป็น MySQL ให้เปิด Terminal ใหม่หรือลบ `STORAGE_MODE` / `PORT` ที่ตั้งไว้
 
-- Username: `admin`
-- Password: `password123`
-- Token ที่ API ส่งคืน: `mock-jwt-token`
+## รันกับ MySQL บนคลาวด์
 
-ข้อมูลมีพนักงานเริ่มต้น 6 คน เก็บใน array บนเซิร์ฟเวอร์ การปิด/เริ่ม backend ใหม่จะคืนข้อมูลเริ่มต้นตามโจทย์ การรีเฟรชหน้าเว็บจะต้องล็อกอินใหม่
+ขั้นตอนครบอยู่ใน [DEPLOYMENT.md](DEPLOYMENT.md)
 
-## เชื่อมต่อจากมือถือหรือ Emulator
+1. ตั้งค่า `backend/.env` จาก `.env.example` ด้วย DB credentials ของตัวเอง (ไฟล์จริงถูก ignore)
+2. อัปโหลด backend และ public ที่ build แล้วไปโฟลเดอร์ใหม่ `/app/hr-final/backend`
+3. เข้า SSH แบบ interactive พอร์ต 2222 แล้วรัน `npm ci --omit=dev`, `node init-db.js`, `node verify-mysql.js` และ `node server.js`
+4. ตรวจ `/api/health` ต้องได้ `success: true, storage: "mysql"`
 
-มือถือและคอมพิวเตอร์ต้องอยู่ Wi-Fi เดียวกัน แอปจะพยายามใช้ IP ของ Expo dev server อัตโนมัติ หากเชื่อมต่อไม่ได้ ให้คัดลอก `frontend/.env.example` เป็น `frontend/.env` และกำหนด:
+ผู้ที่ clone ใหม่ต้องสร้าง `backend/.env` เองจากตัวอย่าง ไม่มีรหัสผ่านฐานข้อมูลจริงใน Git
+
+หากใช้ frontend ผ่าน Expo ในเครื่องกับ API คลาวด์ ให้สร้าง `frontend/.env`:
 
 ```dotenv
-EXPO_PUBLIC_API_URL=http://192.168.1.100:5000
+EXPO_PUBLIC_API_URL=http://119.59.102.161:3009
 ```
 
-แทน IP ด้วย IPv4 ของเครื่องที่รัน backend จาก `ipconfig` แล้วเริ่ม Expo ใหม่ หากมี Windows Firewall ให้ผู้ใช้อนุญาต Node.js บนเครือข่ายที่ใช้งาน
+เริ่ม Expo ใหม่หลังแก้ `.env` เมื่อใช้ API คลาวด์ มือถือไม่จำเป็นต้องอยู่ Wi-Fi เดียวกับคอมพิวเตอร์ที่พัฒนา
 
-- เว็บบนเครื่องเดียวกัน: `http://localhost:5000`
-- Android Emulator: `http://10.0.2.2:5000` หรือ IP ของเครื่อง
-- iOS Simulator: `http://localhost:5000`
-- มือถือจริง: `http://<LAN-IP-ของคอมพิวเตอร์>:5000`
+## Database
 
-หากเปลี่ยนพอร์ต backend ด้วย environment variable `PORT` ต้องเปลี่ยน `EXPO_PUBLIC_API_URL` ให้ตรงกัน
+ชื่อตารางใช้ชื่อผู้จัดทำเป็น prefix: `Jiramet_` ชื่อฐานข้อมูลยังเป็น `ip_std6730202068` และชื่อคอลัมน์/API ยังคงเดิม เช่น `id`, `name`, `salary`
 
-## สิ่งที่ทำตามโจทย์
+หากเคยใช้ตาราง `hr_` ต้องรัน migration ก่อนใช้โค้ดรุ่นนี้ ดูขั้นตอนใน [DEPLOYMENT.md](DEPLOYMENT.md)
 
-| ข้อกำหนด | การทำงาน |
+ใช้ database เดิมที่ได้รับจากอาจารย์ ไม่สร้างหรือลบ database และไม่แก้ตารางเดิม `users`, `products`, `orders` ฯลฯ
+
+| ตารางใหม่ | ข้อมูลที่เก็บ |
 | --- | --- |
-| Login | ตรวจ admin / password123, รหัสผิดตอบ 401 และแสดง Alert |
-| ป้องกันการเข้าถึง | Dashboard ต้องล็อกอิน และ employee API ทุกเส้นทางต้องส่ง Bearer token |
-| ข้อมูลพนักงาน | id, name, position, status, salary เป็นตัวเลข มีข้อมูลเริ่มต้น 6 คน |
-| แสดงข้อมูล | รายชื่อ ตำแหน่ง สถานะ เงินเดือน พร้อมสรุปจำนวนและ payroll |
-| เพิ่มพนักงาน | ตรวจค่าว่างทั้ง client/server, trim ช่องว่าง, ตรวจเงินเดือนเป็นตัวเลขที่ไม่ติดลบ |
-| สลับสถานะ | Active ↔ On Leave และแสดงผลทันที |
-| ลบพนักงาน | ยืนยัน “Are you sure?” ก่อนส่ง DELETE; Native ใช้ Alert, Web ใช้ confirm |
-| วิเคราะห์เงินเดือน | ปุ่ม Analyze Salary Structure เรียก backend มี Loading Indicator |
-| ผลวิเคราะห์ | แสดง Tier 1–3, จำนวนคน และ centroid/เงินเดือนเฉลี่ย |
-| ข้อผิดพลาด | จัดการ network timeout, API error, ไม่พบ id, JSON เสีย และการกดซ้ำระหว่างทำงาน |
+| Jiramet_employees | ชื่อ ตำแหน่ง สถานะ เงินเดือน และเวลาเพิ่ม/แก้ไข |
+| Jiramet_users | บัญชีแอป โดยเก็บ password เป็น scrypt hash พร้อม random salt |
+| Jiramet_sessions | hash ของ mock token ตามรูปแบบที่โจทย์กำหนด |
+| Jiramet_salary_analyses | snapshot เงินเดือน, ผล cluster และเวลาวิเคราะห์แต่ละครั้ง |
+| Jiramet_schema_migrations | บันทึกว่าลงข้อมูลตั้งต้นแล้ว ป้องกัน seed ซ้ำ |
 
-### API
+`npm run init-db` สร้างตารางและพนักงานตัวอย่าง 6 คนครั้งแรก การรันซ้ำไม่ reset พนักงานและไม่เติมข้อมูลที่ผู้ใช้ลบไปแล้ว คำสั่ง CRUD ใช้ SQL parameters; salary เก็บเป็น DECIMAL(18,2)
+
+คลาวด์ที่ใช้งานไม่มี REFERENCES privilege จึงใช้ดัชนี user_id ใน Jiramet_sessions และตรวจความสัมพันธ์กับ Jiramet_users ด้วย JOIN ตอนยืนยัน token แทน database foreign key
+
+`npm run verify:mysql` ตรวจการบันทึกถาวรโดยเพิ่มพนักงานทดสอบ 1 ราย ปิดและเปิด connection ใหม่ ตรวจเงินเดือนทศนิยม สลับสถานะสองครั้ง แล้วลบเฉพาะแถวทดสอบที่คำสั่งนี้สร้างเอง ไม่ลบข้อมูลพนักงานคนอื่น
+
+## ฟังก์ชันตามโจทย์
+
+- Login พร้อมแจ้งเตือนเมื่อรหัสผิด; ป้องกัน Dashboard และ employee API ด้วย Bearer token
+- ปุ่ม ไทย / EN บนหน้า Login และ Dashboard เปลี่ยนข้อความ ฟอร์ม สถานะ และข้อความยืนยัน/แจ้งเตือนทันที เริ่มต้นภาษาไทย และเว็บจำภาษาที่เลือกไว้ใน browser
+- แสดงชื่อ ตำแหน่ง สถานะ เงินเดือน พร้อมฟอร์มเพิ่มพนักงาน
+- ตรวจข้อมูลทั้ง frontend/backend: ห้ามค่าว่าง ชื่อ/ตำแหน่งไม่เกิน 255 ตัวอักษร เงินเดือนไม่ติดลบและทศนิยมไม่เกิน 2 ตำแหน่ง
+- Toggle Status: Active ↔ On Leave
+- Delete พร้อม “Are you sure?” ก่อนส่ง request (Native ใช้ Alert, Web ใช้ confirm)
+- Analyze Salary Structure พร้อม loading และการ์ด Tier 1–3: count, centroid
+- ในโหมด MySQL บันทึกประวัติผลวิเคราะห์ลง DB ด้วย
+- จัดการ network timeout, DB error, JSON ผิด, id ไม่มีอยู่ และการกดซ้ำขณะทำงาน
+
+## API
 
 | Method | Path | ผลสำเร็จ |
 | --- | --- | --- |
-| POST | /api/login | 200 `{ "success": true, "token": "mock-jwt-token" }` |
-| GET | /api/employees | 200 array พนักงาน |
-| POST | /api/employees | 201 พนักงานใหม่; body มี name, position, salary |
-| PUT | /api/employees/:id/status | 200 พนักงานหลังสลับสถานะ; ไม่ต้องส่ง body |
-| DELETE | /api/employees/:id | 200 `{ "success": true }` |
-| GET | /api/employees/salary-clusters | 200 `{ "success": true, "clusters": [...] }` |
-| GET | /api/health | 200 ใช้ตรวจว่าเซิร์ฟเวอร์ทำงาน |
+| POST | /api/login | 200, success และ token |
+| GET | /api/employees | 200, array พนักงาน |
+| POST | /api/employees | 201, พนักงานใหม่ |
+| PUT | /api/employees/:id/status | 200, พนักงานหลังสลับสถานะ |
+| DELETE | /api/employees/:id | 200, success |
+| GET | /api/employees/salary-clusters | 200, success และ clusters; MySQL บันทึกผลด้วย |
+| GET | /api/health | 200, success และ storage; DB ใช้ไม่ได้จะตอบ 503 |
 
-ทุกเส้นทาง `/api/employees` ต้องส่ง `Authorization: Bearer mock-jwt-token` หากไม่ส่งหรือ token ผิดจะตอบ 401; ข้อมูลเพิ่มพนักงานไม่ถูกต้องตอบ 400; id ที่ไม่มีอยู่ตอบ 404
+ทุกเส้นทาง `/api/employees` ต้องส่ง `Authorization: Bearer mock-jwt-token` โหมด MySQL ต้องล็อกอินก่อนจึงมี session ใน DB
 
-ตัวอย่าง body สำหรับเพิ่มพนักงาน:
+ตัวอย่างเพิ่มพนักงาน:
 
 ```json
-{ "name": "John Doe", "position": "Software Engineer", "salary": 45000 }
+{ "name": "John Doe", "position": "Software Engineer", "salary": 45000.50 }
 ```
 
-salary ต้องเป็น JSON number ที่ finite, ไม่ติดลบ และไม่เกิน `Number.MAX_SAFE_INTEGER` รองรับเงินเดือน 0; string `"45000"`, ค่าว่าง, null และ boolean ใช้ไม่ได้
+salary ต้องเป็น JSON number ที่ finite ไม่ติดลบ ไม่เกิน Number.MAX_SAFE_INTEGER และมีทศนิยมไม่เกิน 2 ตำแหน่ง ค่า 0 ใช้ได้ ส่วน `"45000"`, null, boolean ใช้ไม่ได้
 
-### K-Means
+## K-Means
 
-ทำ 1D K-Means บน **salary ของพนักงานปัจจุบันทั้งหมด** ที่ backend ใช้ k=3 เริ่มจากค่าต่ำสุด ค่ากลาง และค่าสูงสุดของค่าที่ไม่ซ้ำ วนจัดกลุ่มใกล้ centroid และคำนวณค่าเฉลี่ยจนลู่เข้าหรือครบ 100 รอบ เรียง centroid จากน้อยไปมากเป็น Tier 1–3 ปัดค่าเฉลี่ยที่แสดงเป็น 2 ตำแหน่ง
+Backend ดึง salary ของพนักงานปัจจุบันทั้งหมด ใช้ 1D K-Means k=3 เริ่มจากค่าต่ำสุด ค่ากลาง และค่าสูงสุดของค่าที่ไม่ซ้ำ วนจนลู่เข้าหรือครบ 100 รอบ แล้วเรียง centroid จากต่ำไปสูงเป็น Tier 1–3
 
-หากมีค่าเงินเดือนที่แตกต่างกันน้อยกว่า 3 ค่า จะใช้จำนวนกลุ่มที่มีข้อมูลจริง และเติม tier ว่างให้ครบ 3 กลุ่ม โดยกลุ่มว่างมี `count: 0, centroid: null` ไม่สร้างค่าเฉลี่ยเทียม ถ้าไม่มีพนักงานจะได้ 3 กลุ่มว่าง
+หากมีเงินเดือนต่างกันน้อยกว่า 3 ค่า เติม tier ว่างด้วย `count: 0, centroid: null` ให้ครบ 3 กลุ่ม หากไม่มีพนักงานจะได้ 3 กลุ่มว่าง ไม่สร้างค่าเฉลี่ยเทียม ผลเริ่มต้นคือ 20,000 / 46,500 / 90,000 บาท กลุ่มละ 2 คน
 
-ผลเริ่มต้น: Tier 1 = 20,000 (2 คน), Tier 2 = 46,500 (2 คน), Tier 3 = 90,000 (2 คน) เมื่อเพิ่ม/สลับสถานะ/ลบพนักงาน แอปจะล้างผลวิเคราะห์เดิม ให้กดวิเคราะห์ใหม่เพื่อใช้ข้อมูลล่าสุด
-
-## ส่วนที่นำมาจากโค้ดเดิม
-
-- ใช้โครง package และเวอร์ชัน Expo/React Native เดิม พร้อม TypeScript config
-- ปรับ AuthContext จาก user object เป็น token ตาม response ในโจทย์
-- ปรับรูปแบบ fetch/login + Expo Router เป็นหน้าล็อกอินและ Dashboard ของ HR
-- ดัดแปลงแนวคิด `enrichWithKMeans` ที่เดิมจัดกลุ่มราคาสินค้า เป็น salary clustering บน backend และเพิ่มการจัดการชุดข้อมูลว่าง/ซ้ำ
-- ใช้ไฟล์ app icon เดิม; ไม่ยก MySQL, ข้อมูลสมาชิก, ที่อยู่ API เดิม หรือระบบร้านค้าเข้ามา
-
-อ้างอิง API ของ framework: [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/) และ [Expo Router SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/router/)
+เมื่อข้อมูลพนักงานเปลี่ยน frontend ล้างผลเดิม ให้กดวิเคราะห์ใหม่เพื่อใช้ข้อมูลล่าสุด
 
 ## ตรวจสอบ
 
@@ -123,40 +160,31 @@ cd backend
 npm test
 cd ../frontend
 npm run typecheck
-npm run export:web
 ```
 
-ผลตรวจในเครื่องนี้: backend tests ผ่าน 3 ชุด (หลายกรณีต่อชุด), TypeScript ผ่าน, export เว็บ/Android/iOS ผ่าน และ API กับ Expo dev server ตอบ HTTP ได้จริง การ export บน Android/iOS เป็นการตรวจ bundle ไม่ใช่การทดสอบบนเครื่องจริง ยังไม่ได้ตรวจการกด UI และรูปแบบหน้าจอในเบราว์เซอร์/มือถือ เพราะช่องทางควบคุมเบราว์เซอร์ไม่พร้อมใช้งาน
-
-การติดตั้งใหม่ผ่าน npm registry ถูกจำกัดโดย sandbox ใน session นี้ จึงใช้ node_modules เดิมที่มีเวอร์ชันตรงกันเพื่อทดสอบ และสร้าง package-lock.json สำหรับ `npm ci` บนเครื่องผู้ตรวจ ไม่ใส่ node_modules ในไฟล์ ZIP
-
-การทดสอบ backend ครอบคลุม login สำเร็จ/ล้มเหลว, ป้องกัน endpoint, validation, JSON เสีย, เพิ่ม/อ่าน/สลับสถานะสองครั้ง/ลบ, id ไม่มีอยู่, id ไม่ซ้ำหลังลบ, analytics จากข้อมูลล่าสุด และกรณีไม่มีพนักงาน รวมถึง K-Means ข้อมูลอ้างอิง/เงินเดือนซ้ำ/น้อยกว่า 3 ค่า/เงินเดือน 0
-
-ตรวจหน้าจอด้วยตนเองก่อนส่ง:
-
-1. เข้า Dashboard โดยยังไม่ล็อกอิน ต้องเปลี่ยนไปหน้า Login
-2. ล็อกอินผิด ต้องมี Alert แล้วล็อกอินด้วยบัญชีข้างต้น
-3. กด Add Employee ขณะฟอร์มว่าง ต้องไม่ส่งข้อมูล; ลองเงินเดือนติดลบ/ไม่ใช่ตัวเลข
-4. เพิ่มพนักงาน เงินเดือน 35000 แล้วตรวจข้อมูลในรายการ
-5. กด Toggle Status สองครั้ง ต้องเปลี่ยน Active → On Leave → Active
-6. กด Delete แล้ว Cancel ต้องยังอยู่; กด Delete แล้วยืนยันต้องหายไป
-7. กด Analyze Salary Structure ต้องมี Loading และการ์ดครบ 3 Tier
-8. เพิ่ม/ลบแล้ววิเคราะห์ใหม่ ยอดคนรวมต้องตรงกับรายชื่อ
-9. Sign out แล้ว Dashboard ต้องถูกป้องกัน
-
-## ส่งงาน
-
-สร้าง **Public GitHub repository** ชื่อ `Std0202068IPFinal2026` แล้ว push จากโฟลเดอร์นี้หรือโฟลเดอร์ที่แตกจาก ZIP:
+Build เว็บสำหรับเสิร์ฟจาก backend เดียวกัน (รันในเครื่อง ไม่ต้องติดตั้ง Expo บนคลาวด์):
 
 ```powershell
-git init
-git add .
-git commit -m "Build HR manager and salary analytics final project"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/Std0202068IPFinal2026.git
-git push -u origin main
+cd backend
+npm ci
+cd ../frontend
+npm ci
+cd ../backend
+npm run build:cloud
 ```
 
-แทน YOUR_USERNAME ด้วยบัญชีจริง ตรวจหน้า GitHub ว่ามี `backend/` และ `frontend/` ที่ root จากนั้นนำ URL repository ไปส่ง LMS ตามเวลาที่ผู้สอนกำหนด
+ไฟล์เว็บจะอยู่ `backend/public/` โดยตั้ง API เป็นปลายทางคลาวด์ หากเปลี่ยน URL ใช้ `npm run build:cloud -- https://YOUR_API_HOST`
 
-ขั้นตอนเผยแพร่ GitHub และส่ง LMS ยังต้องดำเนินการ ไม่ใช่ผลจากการสร้างโค้ดในเครื่อง
+ตรวจสอบล่าสุด: backend tests ผ่าน 12 ชุด ครอบคลุม API/validation/error handling/config/K-Means และ migration; TypeScript และ build เว็บ/Android/iOS ผ่าน การทดสอบ MySQL บนคลาวด์ผ่านการบันทึกข้อมูล ปิดและเปิด connection ใหม่ ตรวจทศนิยม สลับสถานะ และลบแถวทดสอบ การเปลี่ยนชื่อเป็น Jiramet_ สำเร็จโดยคงข้อมูลเดิมไว้ การกดใช้งาน UI ทุกขั้นตอนบน browser/มือถือจริงยังต้องตรวจด้วยตนเอง
+
+## โค้ดที่นำมาจากโปรเจกต์เดิม
+
+ใช้เวอร์ชัน Expo / React Native, TypeScript config, AuthContext, รูปแบบ login/fetch, แนวคิด K-Means, และรูปแบบ MySQL connection pool เดิม ปรับเป็นตาราง HR แยกจากงานร้านค้า
+
+เอกสารอ้างอิง: [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), [MySQL2](https://sidorares.github.io/node-mysql2/docs)
+
+## ส่ง GitHub / LMS
+
+Repository สำหรับส่งงาน: **[Std0202068IPFinal2026](https://github.com/Jiramet2005/Std0202068IPFinal2026)** โดยมี backend/ และ frontend/ ที่ root และไม่รวม `.env`, node_modules, tmp หรือชุดอัปโหลดส่วนตัว
+
+ส่ง URL repository นี้เข้า LMS ตามกำหนดของรายวิชา การอัปโหลด GitHub ไม่ใช่การส่ง LMS โดยอัตโนมัติ
